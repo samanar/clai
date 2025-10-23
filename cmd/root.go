@@ -5,9 +5,8 @@ package cmd
 
 import (
 	"os"
-	"path"
 
-	"github.com/samanar/clai/components"
+	"github.com/samanar/clai/model"
 	"github.com/spf13/cobra"
 )
 
@@ -16,9 +15,30 @@ var rootCmd = &cobra.Command{
 	Use:   "clai",
 	Short: "A brief description of your application",
 	Run: func(cmd *cobra.Command, args []string) {
-		// manifest := bootstrap.DefaultManifest()
-		components.Download("https://github.com/samanar/gitkit/releases/download/v1.1.0/gitkit-linux-amd64", path.Join(".", "gitkit"), true)
-		// components.Download(manifest.Model.URL, path.Join(".", manifest.Model.Filename))
+		model := model.NewModel()
+		if err := model.EnsureAssets(); err != nil {
+			panic(err)
+		}
+		userInput := "compress folder to zip very fast "
+		model.Ask(userInput)
+
+		userInput = "get sha256 check sum of a file"
+		model.Ask(userInput)
+
+		userInput = "get sha256 check sum of a file"
+		model.Ask(userInput)
+
+		userInput = "get 5 largest files in a directory"
+		model.Ask(userInput)
+
+		userInput = "delete all unused images in docker "
+		model.Ask(userInput)
+		// for i, result := range results {
+		// 	cmd.Printf("Command %d:\n", i+1)
+		// 	cmd.Printf("  Command: %s\n", result.Cmd)
+		// 	cmd.Printf("  Args: %v\n", result.Args)
+		// 	cmd.Printf("  Explanation: %s\n", result.Explain)
+		// }
 	},
 }
 

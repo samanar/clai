@@ -45,7 +45,6 @@ type DownloadModel struct {
 	progress     progress.Model
 	err          error
 	done         bool
-	executable   bool
 	progressChan chan progressMsg
 }
 
@@ -55,7 +54,7 @@ func (m DownloadModel) Error() error {
 }
 
 // NewDownloadModel creates a new download model
-func NewDownloadModel(url, destPath string, executable bool) DownloadModel {
+func NewDownloadModel(url, destPath string) DownloadModel {
 	prog := progress.New(progress.WithDefaultGradient())
 	prog.Width = maxWidth - padding*2 - 4
 
@@ -64,7 +63,6 @@ func NewDownloadModel(url, destPath string, executable bool) DownloadModel {
 		destPath:     destPath,
 		progress:     prog,
 		progressChan: make(chan progressMsg, 100),
-		executable:   executable,
 	}
 }
 
@@ -189,13 +187,6 @@ func (m DownloadModel) downloadFile() tea.Msg {
 		return progressErrMsg{err: fmt.Errorf("failed to save file: %w", err)}
 	}
 
-	// Make the file executable (0755 = rwxr-xr-x)
-	if m.executable {
-		if err := os.Chmod(m.destPath, 0755); err != nil {
-			return progressErrMsg{err: fmt.Errorf("failed to make file executable: %w", err)}
-		}
-	}
-
 	return downloadCompleteMsg{path: m.destPath}
 }
 
@@ -225,8 +216,8 @@ func (pw *progressWriter) Downloaded() int64 {
 }
 
 // Download starts a download with progress display
-func Download(url, destPath string, executable bool) error {
-	m := NewDownloadModel(url, destPath, executable)
+func Download(url, destPath string) error {
+	m := NewDownloadModel(url, destPath)
 	p := tea.NewProgram(m)
 
 	if _, err := p.Run(); err != nil {
