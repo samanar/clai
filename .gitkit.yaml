@@ -1,0 +1,18 @@
+repo: Github
+branches:
+    main: main
+    develop: develop
+prefixes:
+    bugFix:
+        name: bugfix/
+        base: develop
+    feature:
+        name: feature/
+        base: develop
+    hotFix:
+        name: hotfix/
+        base: main
+    release:
+        name: release/
+        base: develop
+remote: origin
