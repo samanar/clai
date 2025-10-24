@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/samanar/clai/components"
 	"gopkg.in/yaml.v3"
 )
 
@@ -102,5 +103,43 @@ func (cfg *Config) Load() error {
 		return err
 	}
 	*cfg = claiConfig
+	return nil
+}
+
+func (cfg *Config) Save() error {
+	configPath, err := cfg.FullPath()
+	if err != nil {
+		return err
+	}
+
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (cfg *Config) UpdatePrompt() error {
+	options := []components.SelectOption{}
+	for _, model := range AllModels {
+		options = append(options, components.SelectOption{
+			Title:       model.Filename,
+			Description: fmt.Sprintf("%s (Size: %s)", model.Description, model.DownloadSize),
+			Value:       model.Filename,
+		})
+	}
+	selected, err := components.Select(options)
+	if err != nil {
+		return err
+	}
+	cfg.Model = ToModelType(selected)
+	if err := cfg.Save(); err != nil {
+		return err
+	}
 	return nil
 }

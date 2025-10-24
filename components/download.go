@@ -19,7 +19,7 @@ const (
 )
 
 var (
-	currentPkgNameStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("211"))
+	currentPkgNameStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("75"))
 	doneStyle           = lipgloss.NewStyle().Margin(1, 2)
 	checkMark           = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).SetString("✓")
 	errorStyle          = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
@@ -55,7 +55,9 @@ func (m DownloadModel) Error() error {
 
 // NewDownloadModel creates a new download model
 func NewDownloadModel(url, destPath string) DownloadModel {
-	prog := progress.New(progress.WithDefaultGradient())
+	prog := progress.New(
+		progress.WithScaledGradient("#00d9ff", "#0066ff"), // Blue gradient
+	)
 	prog.Width = maxWidth - padding*2 - 4
 
 	return DownloadModel{

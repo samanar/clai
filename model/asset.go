@@ -34,6 +34,19 @@ func (mt ModelType) String() string {
 	return string(mt)
 }
 
+func ToModelType(stringVal string) ModelType {
+	switch stringVal {
+	case ModelGemma3_1B.String():
+		return ModelGemma3_1B
+	case ModelLlama3_2B.String():
+		return ModelLlama3_2B
+	case ModelGemma3_4B.String():
+		return ModelGemma3_4B
+	default:
+		return ModelGemma3_1B
+	}
+}
+
 var AllModels = []Asset{
 	{
 		URL:          "https://huggingface.co/Mozilla/gemma-3-1b-it-llamafile/resolve/main/google_gemma-3-1b-it-Q6_K.llamafile?download=true",
