@@ -4,7 +4,9 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
+	"fmt"
 	"os"
+	"strings"
 
 	"github.com/samanar/clai/model"
 	"github.com/spf13/cobra"
@@ -12,36 +14,75 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "clai",
-	Short: "A brief description of your application",
+	Use:   "clai [query]",
+	Short: "Convert natural language to shell commands using local AI",
+	Long: `CLAI is a CLI tool that converts natural language into shell commands 
+using fully offline local LLM models. No API keys, no internet required.
+
+Examples:
+  clai list all python files
+  clai compress the logs folder
+  clai show disk usage
+
+Special commands:
+  clai config show         - Show current configuration
+  clai config set-model    - Change the LLM model`,
+	Args:                       cobra.ArbitraryArgs,
+	FParseErrWhitelist:         cobra.FParseErrWhitelist{UnknownFlags: true},
+	DisableFlagParsing:         false,
+	SuggestionsMinimumDistance: 2,
+	DisableSuggestions:         true,
+	SilenceErrors:              true,
 	Run: func(cmd *cobra.Command, args []string) {
-		model, err := model.NewModel()
+		// Join all arguments into a single string as user input
+		if len(args) == 0 {
+			cmd.Println("Error: Please provide a query")
+			cmd.Println("Usage: clai \"your query here\"")
+			os.Exit(1)
+		}
+		fmt.Println(args)
+
+		userInput := strings.Join(args, " ")
+
+		m, err := model.NewModel()
 		if err != nil {
-			panic(err)
+			fmt.Fprintf(os.Stderr, "Error initializing model: %v\n", err)
+			os.Exit(1)
 		}
-		if err := model.EnsureAssets(); err != nil {
-			panic(err)
+
+		if err := m.EnsureAssets(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error ensuring assets: %v\n", err)
+			os.Exit(1)
 		}
-		userInput := "compress folder to zip very fast "
-		model.Ask(userInput)
 
-		userInput = "get sha256 check sum of a file"
-		model.Ask(userInput)
+		results, err := m.Ask(userInput)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Error processing query: %v\n", err)
+			os.Exit(1)
+		}
 
-		userInput = "get sha256 check sum of a file"
-		model.Ask(userInput)
+		// Display results
+		if len(results) == 0 {
+			cmd.Println("No commands generated")
+			return
+		}
 
-		userInput = "get 5 largest files in a directory"
-		model.Ask(userInput)
+		cmd.Println("\nGenerated Commands:")
+		cmd.Println(strings.Repeat("─", 60))
 
-		userInput = "delete all unused images in docker "
-		model.Ask(userInput)
-		// for i, result := range results {
-		// 	cmd.Printf("Command %d:\n", i+1)
-		// 	cmd.Printf("  Command: %s\n", result.Cmd)
-		// 	cmd.Printf("  Args: %v\n", result.Args)
-		// 	cmd.Printf("  Explanation: %s\n", result.Explain)
-		// }
+		for i, result := range results {
+			cmd.Printf("\n%d. %s\n", i+1, result.Explain)
+
+			// Build full command string
+			fullCmd := result.Cmd
+			if len(result.Args) > 0 {
+				fullCmd += " " + strings.Join(result.Args, " ")
+			}
+
+			cmd.Printf("   $ %s\n", fullCmd)
+		}
+
+		cmd.Println()
 	},
 }
 
