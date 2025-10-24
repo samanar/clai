@@ -15,7 +15,10 @@ var rootCmd = &cobra.Command{
 	Use:   "clai",
 	Short: "A brief description of your application",
 	Run: func(cmd *cobra.Command, args []string) {
-		model := model.NewModel()
+		model, err := model.NewModel()
+		if err != nil {
+			panic(err)
+		}
 		if err := model.EnsureAssets(); err != nil {
 			panic(err)
 		}

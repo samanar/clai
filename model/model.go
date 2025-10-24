@@ -19,12 +19,22 @@ type Result struct {
 
 type Model struct {
 	manifest Manifest
+	Config   Config
 }
 
-func NewModel() Model {
-	return Model{
-		manifest: NewManifest(),
+func NewModel() (Model, error) {
+	config, err := NewConfig()
+	if err != nil {
+		return Model{}, err
 	}
+	manifest, err := NewManifest()
+	if err != nil {
+		return Model{}, err
+	}
+	return Model{
+		manifest: manifest,
+		Config:   config,
+	}, nil
 }
 
 func (m *Model) GetModelAsset() Asset {
