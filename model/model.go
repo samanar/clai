@@ -63,8 +63,8 @@ func (m *Model) Ask(userInput string) ([]Result, error) {
 Task: %s
 
 Rules:
-- Return 1-3 real Linux commands only
-- Use actual commands: ls, find, tar, zip, sha256sum, docker, etc.
+- Return 1-4 real Linux commands only
+- Use actual commands
 - Most common solution first
 - Args as separate array elements
 
@@ -72,16 +72,16 @@ JSON format:
 [{"cmd":"command","args":["arg1","arg2"],"explain":"description"}]
 
 Output:`, userInput)
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	llamaFilePath, err := m.GetLlamaAsset().FullPath()
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to get llamafile path: %v", err)
 	}
 	modelPath, err := m.GetModelAsset().FullPath()
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("failed to get model path: %v", err)
 	}
 
 	// GBNF grammar for JSON array of command objects
@@ -107,12 +107,16 @@ ws ::= [ \t\n\r]*`
 		llamaFilePath,
 		"-m", modelPath,
 		"--no-display-prompt",
+		"--fast",
+		"-ngl", "32", // Enable GPU layers if available
+		"--mlock", // Lock model in memory
 		"--grammar-file", tmp.Name(),
 		"-p", prompt,
 		"--temp", "0.3", // Lower temperature for more consistent results
-		"--n-predict", "800", // Enough for multiple commands
-		"--ctx-size", "4096",
-		"--repeat-penalty", "1.1",
+		"--n-predict", "400", // Reduced for faster processing
+		"--ctx-size", "2048", // Reduced context size
+		// "--repeat-penalty", "1.1",
+		"--threads", "4", // Limit CPU threads
 	}
 	var stdout, stderr bytes.Buffer
 	cmd := exec.CommandContext(ctx, "/bin/bash", llamaArgs...)

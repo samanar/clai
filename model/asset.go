@@ -55,7 +55,7 @@ var AllModels = []Asset{
 		Description:  "Gemma3 1B. low resource usage. low accuracy.",
 	},
 	{
-		URL:          "https://huggingface.co/Mozilla/Llama-3.2-3B-Instruct-llamafile/resolve/main/Llama-3.2-3B-Instruct.Q6_K.llamafile",
+		URL:          "https://huggingface.co/Mozilla/Llama-3.2-3B-Instruct-llamafile/resolve/main/Llama-3.2-3B-Instruct.Q6_K.llamafile?download=true",
 		Filename:     ModelLlama3_2B.String(),
 		DownloadSize: "2.62 GB",
 		Description:  "Llama 3.2 3B. moderate resource usage. better accuracy.",
