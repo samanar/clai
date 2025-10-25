@@ -58,20 +58,8 @@ func (m *Model) EnsureAssets() error {
 func (m *Model) Ask(userInput string) ([]Result, error) {
 	// Get current working directory for context
 
-	prompt := fmt.Sprintf(`Generate shell commands as JSON array.
-
-Task: %s
-
-Rules:
-- Return 1-4 real Linux commands only
-- Use actual commands
-- Most common solution first
-- Args as separate array elements
-
-JSON format:
-[{"cmd":"command","args":["arg1","arg2"],"explain":"description"}]
-
-Output:`, userInput)
+	manReference := buildManReference(userInput)
+	prompt := buildPrompt(userInput, manReference)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
@@ -115,7 +103,6 @@ ws ::= [ \t\n\r]*`
 		"--temp", "0.3", // Lower temperature for more consistent results
 		"--n-predict", "400", // Reduced for faster processing
 		"--ctx-size", "2048", // Reduced context size
-		// "--repeat-penalty", "1.1",
 		"--threads", "4", // Limit CPU threads
 	}
 	var stdout, stderr bytes.Buffer
@@ -128,8 +115,6 @@ ws ::= [ \t\n\r]*`
 	}
 
 	raw := strings.TrimSpace(stdout.String())
-	fmt.Println("user iput:\n", userInput)
-	fmt.Println("LLM Response:\n", raw)
 
 	// Parse the JSON response into an array of Result objects
 	var results []Result
@@ -138,4 +123,28 @@ ws ::= [ \t\n\r]*`
 	}
 
 	return results, nil
+}
+
+func buildPrompt(userInput, manReference string) string {
+	var builder strings.Builder
+	builder.WriteString("Generate shell commands as JSON array.\n\n")
+	builder.WriteString(fmt.Sprintf("Task: %s\n\n", userInput))
+
+	if manReference != "" {
+		builder.WriteString("Reference material from relevant man pages:\n")
+		builder.WriteString("[MANPAGE EXCERPT]\n")
+		builder.WriteString(manReference)
+		builder.WriteString("\n[/MANPAGE EXCERPT]\n\n")
+	}
+
+	builder.WriteString("Rules:\n")
+	builder.WriteString("- Return 1-4 real Linux commands only\n")
+	builder.WriteString("- Use actual commands\n")
+	builder.WriteString("- Most common solution first\n")
+	builder.WriteString("- Args as separate array elements\n\n")
+	builder.WriteString("JSON format:\n")
+	builder.WriteString(`[{"cmd":"command","args":["arg1","arg2"],"explain":"description"}]`)
+	builder.WriteString("\n\nOutput:")
+
+	return builder.String()
 }
