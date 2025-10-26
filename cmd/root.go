@@ -67,9 +67,6 @@ Special commands:
 			return
 		}
 
-		cmd.Println("\nGenerated Commands:")
-		cmd.Println(strings.Repeat("─", 60))
-
 		for i, result := range results {
 			cmd.Printf("\n%d. %s\n", i+1, result.Explain)
 

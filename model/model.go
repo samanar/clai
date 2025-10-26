@@ -9,6 +9,8 @@ import (
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/samanar/clai/components"
 )
 
 type Result struct {
@@ -110,7 +112,32 @@ ws ::= [ \t\n\r]*`
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 
-	if err := cmd.Run(); err != nil {
+	// Create spinner with channel
+	doneChan := make(chan error, 1)
+	cancelChan := make(chan struct{})
+
+	// Start spinner in goroutine
+	go func() {
+		components.ShowSpinner("Generating commands...", doneChan, cancelChan)
+	}()
+
+	// Monitor for cancellation
+	go func() {
+		<-cancelChan
+		if cmd.Process != nil {
+			cmd.Process.Kill()
+		}
+		cancel() // Cancel the context
+	}()
+
+	// Run the command
+	err = cmd.Run()
+
+	// Signal spinner to stop
+	doneChan <- err
+	close(doneChan)
+
+	if err != nil {
 		return nil, fmt.Errorf("llamafile failed: %v\nstderr: %s", err, stderr.String())
 	}
 
