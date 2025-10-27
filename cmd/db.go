@@ -60,14 +60,11 @@ var dbResetCmd = &cobra.Command{
 		// Get count of indexed pages
 		count, err := db.GetManPageCount()
 		if err != nil {
-			return fmt.Errorf("failed to get man page count: %w", err)
+			fmt.Printf("failed to get man page count: %w", err)
+			os.Exit(1)
 		}
 
-		if err := db.IndexManPages(&m); err != nil {
-			return fmt.Errorf("failed to index man pages: %w", err)
-		}
-
-		fmt.Printf("✅ Database reset complete! Indexed %d man pages\n", count)
+		fmt.Printf("\n✅ Database reset complete! Indexed %d man pages\n", count)
 		fmt.Printf("📍 Database location: %s\n", dbPath)
 
 		return nil
