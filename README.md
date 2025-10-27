@@ -17,22 +17,23 @@ A CLI tool that converts natural language into shell commands using **fully offl
 
 ### Prerequisites
 
-- Go 1.25+ installed
-- Linux or macOS
-- Sufficient disk space for the model you choose (1.3 - 3.5 GB)
+- Go 1.21 or higher
+- GCC/Clang (for SQLite CGO compilation)
 
-### Building from Source
+### Build from Source
 
 ```bash
 git clone https://github.com/samanar/clai.git
 cd clai
-go build -o clai
+CGO_ENABLED=1 go build -tags sqlite_fts5 -o clai
+sudo mv clai /usr/local/bin/
 ```
 
-### Moving to PATH (optional)
+Or use the Makefile:
 
 ```bash
-sudo mv clai /usr/local/bin/
+make build
+sudo make install
 ```
 
 ## Usage

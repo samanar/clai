@@ -12,22 +12,15 @@ permissions:
 jobs:
   build:
     name: Build and Release
-    runs-on: ubuntu-latest
     strategy:
       matrix:
         include:
-          - os: linux
-            arch: amd64
-            name: linux-amd64
-          - os: linux
-            arch: arm64
-            name: linux-arm64
-          - os: darwin
-            arch: amd64
-            name: darwin-amd64
-          - os: darwin
-            arch: arm64
-            name: darwin-arm64
+          - os: ubuntu-latest
+            target: linux-amd64
+          - os: macos-latest
+            target: darwin-amd64
+
+    runs-on: ${{ matrix.os }}
 
     steps:
       - name: Checkout code
@@ -40,20 +33,13 @@ jobs:
 
       - name: Build binary
         run: |
-          CGO_ENABLED=0 GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build \
-            -ldflags="-s -w" \
-            -trimpath \
-            -o clai-${{ matrix.name }} \
-            main.go
-
-      - name: Make executable
-        run: chmod +x clai-${{ matrix.name }}
+          CGO_ENABLED=1 go build -tags sqlite_fts5 -ldflags="-s -w" -o clai-${{ matrix.target }}
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: clai-${{ matrix.name }}
-          path: clai-${{ matrix.name }}
+          name: clai-${{ matrix.target }}
+          path: clai-${{ matrix.target }}
 
   release:
     name: Create Release
@@ -118,8 +104,8 @@ jobs:
             ```
 
             **Supported Platforms:**
-            - Linux (amd64, arm64)
-            - macOS (amd64, arm64)
+            - Linux (amd64)
+            - macOS (amd64)
 
             **Note:** On first run, CLAI will download the necessary AI models (~1.3-3.5 GB depending on your selection).
           draft: false
