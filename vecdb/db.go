@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/samanar/clai/model"
 )
 
 type VecDB struct {
@@ -45,11 +45,27 @@ func NewVecDB() (*VecDB, error) {
 
 // getDBPath returns the path to the vector database file
 func getDBPath() (string, error) {
-	appDataDir, err := model.AppDataDir()
+	appDataDir, err := getAppDataDir()
 	if err != nil {
 		return "", err
 	}
 	return filepath.Join(appDataDir, "db", "manpages.db"), nil
+}
+
+// getAppDataDir returns the application data directory (copied from model package to avoid circular import)
+func getAppDataDir() (string, error) {
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	if runtime.GOOS == "darwin" {
+		return filepath.Join(homeDir, "Library", "Application Support", "Clai"), nil
+	}
+	// default to Linux behaviour
+	if dir := os.Getenv("XDG_DATA_HOME"); dir != "" {
+		return filepath.Join(dir, "clai"), nil
+	}
+	return filepath.Join(homeDir, ".local", "share", "clai"), nil
 }
 
 // initSchema creates the necessary tables
@@ -62,6 +78,7 @@ func (v *VecDB) initSchema() error {
 		description TEXT,
 		content TEXT NOT NULL,
 		file_path TEXT NOT NULL,
+		embedding BLOB,
 		indexed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(name, section)
 	);
@@ -141,4 +158,117 @@ func (v *VecDB) GetTableNames() ([]string, error) {
 	}
 
 	return tables, rows.Err()
+}
+
+// UpdateEmbedding updates the embedding vector for a man page
+func (v *VecDB) UpdateEmbedding(id int, embedding []float32) error {
+	bytes := Float32SliceToBytes(embedding)
+	_, err := v.db.Exec("UPDATE man_pages SET embedding = ? WHERE id = ?", bytes, id)
+	return err
+}
+
+// GetManPagesWithoutEmbeddings returns man pages that don't have embeddings yet
+func (v *VecDB) GetManPagesWithoutEmbeddings(limit int) ([]struct {
+	ID          int
+	Name        string
+	Description string
+	Content     string
+}, error) {
+	rows, err := v.db.Query(`
+		SELECT id, name, description, content 
+		FROM man_pages 
+		WHERE embedding IS NULL 
+		LIMIT ?
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []struct {
+		ID          int
+		Name        string
+		Description string
+		Content     string
+	}
+
+	for rows.Next() {
+		var r struct {
+			ID          int
+			Name        string
+			Description string
+			Content     string
+		}
+		if err := rows.Scan(&r.ID, &r.Name, &r.Description, &r.Content); err != nil {
+			continue
+		}
+		results = append(results, r)
+	}
+
+	return results, rows.Err()
+}
+
+// SearchByEmbedding finds similar man pages using cosine similarity
+func (v *VecDB) SearchByEmbedding(queryEmbedding []float32, limit int) ([]SearchResult, error) {
+	rows, err := v.db.Query(`
+		SELECT id, name, section, description, content, embedding
+		FROM man_pages
+		WHERE embedding IS NOT NULL
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	type scored struct {
+		result SearchResult
+		score  float64
+	}
+
+	var candidates []scored
+
+	for rows.Next() {
+		var id, section int
+		var name, description, content string
+		var embeddingBytes []byte
+
+		if err := rows.Scan(&id, &name, &section, &description, &content, &embeddingBytes); err != nil {
+			continue
+		}
+
+		if len(embeddingBytes) == 0 {
+			continue
+		}
+
+		embedding := BytesToFloat32Slice(embeddingBytes)
+		similarity := CosineSimilarity(queryEmbedding, embedding)
+
+		candidates = append(candidates, scored{
+			result: SearchResult{
+				Name:        name,
+				Section:     section,
+				Description: description,
+				Content:     content,
+				Relevance:   similarity,
+			},
+			score: similarity,
+		})
+	}
+
+	// Sort by similarity descending
+	for i := 0; i < len(candidates); i++ {
+		for j := i + 1; j < len(candidates); j++ {
+			if candidates[j].score > candidates[i].score {
+				candidates[i], candidates[j] = candidates[j], candidates[i]
+			}
+		}
+	}
+
+	// Return top results
+	var results []SearchResult
+	for i := 0; i < limit && i < len(candidates); i++ {
+		results = append(results, candidates[i].result)
+	}
+
+	return results, nil
 }

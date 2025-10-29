@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -65,11 +66,91 @@ func (m *Model) EnsureAssets() error {
 	return nil
 }
 
-func (m *Model) Ask(userInput string) ([]Result, error) {
-	// Get current working directory for context
+// GenerateEmbedding generates an embedding vector for the given text using the embedding model
+func (m *Model) GenerateEmbedding(text string) ([]float32, error) {
+	// Truncate text if too long
+	if len(text) > 8000 {
+		text = text[:8000]
+	}
 
-	manReference := buildManReference(userInput)
+	// Clean text
+	text = strings.TrimSpace(text)
+	text = strings.ReplaceAll(text, "\n", " ")
+	text = strings.ReplaceAll(text, "\r", " ")
+
+	llamaPath, err := m.GetLlamaAsset().FullPath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get llamafile path: %w", err)
+	}
+
+	embeddingPath, err := m.GetEmbeddingAsset().FullPath()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get embedding model path: %w", err)
+	}
+
+	args := []string{
+		llamaPath,
+		"-m", embeddingPath,
+		"--embedding",
+		"--log-disable",
+		"-p", text,
+		"--n-predict", "0",
+		"--threads", "4",
+		"-ngl", "999",
+		"--ctx-size", "8192",
+		"--batch-size", "8192",
+	}
+
+	cmd := exec.Command("/bin/bash", args...)
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return nil, fmt.Errorf("embedding generation failed: %v\nstderr: %s", err, stderr.String())
+	}
+
+	output := strings.TrimSpace(stdout.String())
+
+	// Parse space-separated float values
+	floatStrings := strings.Fields(output)
+	if len(floatStrings) == 0 {
+		return nil, fmt.Errorf("no embedding values found in output")
+	}
+
+	var embedding []float32
+	for _, floatStr := range floatStrings {
+		val, err := strconv.ParseFloat(floatStr, 32)
+		if err != nil {
+			continue // Skip invalid values
+		}
+		embedding = append(embedding, float32(val))
+	}
+
+	if len(embedding) == 0 {
+		return nil, fmt.Errorf("no valid embedding values parsed")
+	}
+
+	return embedding, nil
+}
+
+// GenerateQueryEmbedding generates an embedding optimized for user queries
+func (m *Model) GenerateQueryEmbedding(query string) ([]float32, error) {
+	return m.GenerateEmbedding(query)
+}
+
+func (m *Model) Ask(userInput string) ([]Result, error) {
+	// Get relevant man pages using vector search
+	manReference, err := m.buildManReferenceWithVectorSearch(userInput)
+	fmt.Println(manReference)
+	if err != nil {
+		// Fall back to keyword-based search if vector search fails
+		// manReference = buildManReference(userInput)
+	}
+
 	prompt := buildPrompt(userInput, manReference)
+	fmt.Println("--------------------")
+	fmt.Println(prompt)
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 

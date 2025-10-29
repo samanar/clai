@@ -22,6 +22,7 @@ func buildManReference(userInput string) string {
 	defer cancel()
 
 	keywords := extractKeywords(userInput)
+	fmt.Println(keywords)
 	if len(keywords) == 0 {
 		return ""
 	}

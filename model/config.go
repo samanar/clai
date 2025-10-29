@@ -24,7 +24,7 @@ func NewConfig() (Config, error) {
 		return cfg, err
 	}
 	if cfg.Embedding == "" {
-		cfg.Embedding = EmbeddingGemma3
+		cfg.Embedding = EmbeddingQwen3
 	}
 	return cfg, nil
 }
@@ -72,7 +72,7 @@ func (cfg *Config) Create() error {
 
 	// Ask user inputs with defaults
 	claiConfig.Model = ModelGemma3_1B
-	claiConfig.Embedding = EmbeddingGemma3
+	claiConfig.Embedding = EmbeddingQwen3
 
 	// Save YAML file
 	data, err := yaml.Marshal(&claiConfig)
