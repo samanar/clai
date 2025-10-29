@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"runtime"
 	"sync"
 	"sync/atomic"
 
@@ -19,8 +20,35 @@ var dbEmbedCmd = &cobra.Command{
 		fmt.Println("🧠 Generating embeddings for man pages...")
 
 		// Configuration
-		numWorkers := 4
-		batchSize := 100
+		availableCPU := runtime.NumCPU()
+		if availableCPU < 1 {
+			availableCPU = 1
+		}
+
+		workersFlag, _ := cmd.Flags().GetInt("workers")
+		numWorkers := workersFlag
+		if numWorkers <= 0 {
+			numWorkers = availableCPU / 2
+			if numWorkers < 1 {
+				numWorkers = 1
+			}
+		}
+
+		dbWorkers := numWorkers / 2
+		if dbWorkers < 1 {
+			dbWorkers = 1
+		}
+
+		batchSizeFlag, _ := cmd.Flags().GetInt("batch-size")
+		batchSize := batchSizeFlag
+		if batchSize <= 0 {
+			batchSize = numWorkers * 50
+			if batchSize < 50 {
+				batchSize = 50
+			}
+		}
+
+		fmt.Printf("🧵 Using %d embedding workers and %d database workers (batch size %d)\n", numWorkers, dbWorkers, batchSize)
 
 		// Get model
 		m, err := model.NewModel()
@@ -72,6 +100,7 @@ var dbEmbedCmd = &cobra.Command{
 
 			type result struct {
 				id        int
+				name      string
 				embedding []float32
 				err       error
 			}
@@ -83,7 +112,7 @@ var dbEmbedCmd = &cobra.Command{
 			var wg sync.WaitGroup
 			for w := 0; w < numWorkers; w++ {
 				wg.Add(1)
-				go func(workerID int) {
+				go func() {
 					defer wg.Done()
 					for j := range jobs {
 						// Create summary for embedding
@@ -96,11 +125,44 @@ var dbEmbedCmd = &cobra.Command{
 						embedding, err := m.GenerateEmbedding(summary)
 						results <- result{
 							id:        j.id,
+							name:      j.name,
 							embedding: embedding,
 							err:       err,
 						}
 					}
-				}(w)
+				}()
+			}
+
+			var batchProcessed atomic.Int64
+			var batchErrors atomic.Int64
+
+			var dbWg sync.WaitGroup
+			for w := 0; w < dbWorkers; w++ {
+				dbWg.Add(1)
+				go func() {
+					defer dbWg.Done()
+					for res := range results {
+						if res.err != nil {
+							fmt.Printf("⚠️  Failed to generate embedding for %s: %v\n", res.name, res.err)
+							totalErrors.Add(1)
+							batchErrors.Add(1)
+							continue
+						}
+
+						if err := db.UpdateEmbedding(res.id, res.embedding); err != nil {
+							fmt.Printf("⚠️  Failed to save embedding for %s: %v\n", res.name, err)
+							totalErrors.Add(1)
+							batchErrors.Add(1)
+							continue
+						}
+
+						processed := batchProcessed.Add(1)
+						totalProcessed.Add(1)
+						if processed%10 == 0 || processed == int64(len(pages)) {
+							fmt.Printf("   Processed %d/%d in batch (Total: %d)\n", processed, len(pages), totalProcessed.Load())
+						}
+					}
+				}()
 			}
 
 			// Send jobs
@@ -121,29 +183,9 @@ var dbEmbedCmd = &cobra.Command{
 			}()
 
 			// Process results
-			processed := 0
-			for result := range results {
-				if result.err != nil {
-					fmt.Printf("⚠️  Failed to generate embedding: %v\n", result.err)
-					totalErrors.Add(1)
-					continue
-				}
+			dbWg.Wait()
 
-				// Update database
-				if err := db.UpdateEmbedding(result.id, result.embedding); err != nil {
-					fmt.Printf("⚠️  Failed to save embedding: %v\n", err)
-					totalErrors.Add(1)
-					continue
-				}
-
-				processed++
-				totalProcessed.Add(1)
-				if processed%10 == 0 {
-					fmt.Printf("   Processed %d/%d in batch (Total: %d)\n", processed, len(pages), totalProcessed.Load())
-				}
-			}
-
-			fmt.Printf("✅ Batch complete. Processed: %d, Errors: %d\n", processed, totalErrors.Load())
+			fmt.Printf("✅ Batch complete. Processed: %d, Errors: %d\n", batchProcessed.Load(), batchErrors.Load())
 		}
 
 		fmt.Printf("🎉 Embedding generation complete! Total processed: %d, Total errors: %d\n", totalProcessed.Load(), totalErrors.Load())
@@ -153,5 +195,7 @@ var dbEmbedCmd = &cobra.Command{
 }
 
 func init() {
+	dbEmbedCmd.Flags().Int("workers", 0, "Number of embedding workers to run concurrently (0 = auto)")
+	dbEmbedCmd.Flags().Int("batch-size", 0, "Number of man pages fetched per batch (0 = auto)")
 	dbCmd.AddCommand(dbEmbedCmd)
 }
