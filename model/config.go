@@ -13,7 +13,8 @@ const CONFIG_FILE_NAME = "config.yml"
 const CONFIG_FILE_BASE_FOLDER = "config"
 
 type Config struct {
-	Model ModelType `yaml:"model"`
+	Model     ModelType     `yaml:"model"`
+	Embedding EmbeddingType `yaml:"embedding"`
 }
 
 func NewConfig() (Config, error) {
@@ -21,6 +22,9 @@ func NewConfig() (Config, error) {
 	err := cfg.Load()
 	if err != nil {
 		return cfg, err
+	}
+	if cfg.Embedding == "" {
+		cfg.Embedding = EmbeddingGemma3
 	}
 	return cfg, nil
 }
@@ -68,6 +72,7 @@ func (cfg *Config) Create() error {
 
 	// Ask user inputs with defaults
 	claiConfig.Model = ModelGemma3_1B
+	claiConfig.Embedding = EmbeddingGemma3
 
 	// Save YAML file
 	data, err := yaml.Marshal(&claiConfig)

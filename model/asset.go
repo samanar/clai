@@ -18,11 +18,13 @@ type Asset struct {
 }
 
 type Manifest struct {
-	Llama Asset
-	Model Asset
+	Llama     Asset
+	Model     Asset
+	Embedding Asset
 }
 
 type ModelType string
+type EmbeddingType string
 
 const (
 	ModelGemma3_1B ModelType = "gemma-3-1b-it-q6.llamafile"
@@ -30,8 +32,17 @@ const (
 	ModelGemma3_4B ModelType = "gemma-3-4b-it-q6.llamafile"
 )
 
+const (
+	EmbeddingQwen3  EmbeddingType = "qwen3-embedding-0.6B-q8.gguf"
+	EmbeddingGemma3 EmbeddingType = "gemma3-embedding-0.3B-BF16.gguf"
+)
+
 func (mt ModelType) String() string {
 	return string(mt)
+}
+
+func (em EmbeddingType) String() string {
+	return string(em)
 }
 
 func ToModelType(stringVal string) ModelType {
@@ -44,6 +55,17 @@ func ToModelType(stringVal string) ModelType {
 		return ModelGemma3_4B
 	default:
 		return ModelGemma3_1B
+	}
+}
+
+func ToEmbeddingType(stringVal string) EmbeddingType {
+	switch stringVal {
+	case EmbeddingQwen3.String():
+		return EmbeddingQwen3
+	case EmbeddingGemma3.String():
+		return EmbeddingGemma3
+	default:
+		return EmbeddingQwen3
 	}
 }
 
@@ -68,6 +90,21 @@ var AllModels = []Asset{
 	},
 }
 
+var AllEmbeddingModels = []Asset{
+	{
+		URL:          "https://huggingface.co/Qwen/Qwen3-Embedding-0.6B-GGUF/resolve/main/Qwen3-Embedding-0.6B-Q8_0.gguf",
+		Filename:     EmbeddingQwen3.String(),
+		DownloadSize: "639 MB",
+		Description:  "Qwen3 Embedding 0.6B. high quality embeddings for various tasks.",
+	},
+	{
+		URL:          "https://huggingface.co/unsloth/embeddinggemma-300m-GGUF/resolve/main/embeddinggemma-300M-BF16.gguf",
+		Filename:     EmbeddingGemma3.String(),
+		DownloadSize: "612 MB",
+		Description:  "Gemma3 Embedding 0.3B. high quality embeddings for various tasks.",
+	},
+}
+
 func GetModel(modelType ModelType) Asset {
 	for _, model := range AllModels {
 		if model.Filename == modelType.String() {
@@ -78,6 +115,22 @@ func GetModel(modelType ModelType) Asset {
 				DownloadSize: model.DownloadSize,
 				Executable:   false,
 				BaseFolder:   "models",
+			}
+		}
+	}
+	return Asset{}
+}
+
+func GetEmbeddingModel(embeddingType EmbeddingType) Asset {
+	for _, model := range AllEmbeddingModels {
+		if model.Filename == embeddingType.String() {
+			return Asset{
+				URL:          model.URL,
+				Filename:     model.Filename,
+				Description:  model.Description,
+				DownloadSize: model.DownloadSize,
+				Executable:   false,
+				BaseFolder:   "embeddings",
 			}
 		}
 	}
@@ -137,8 +190,9 @@ func NewManifest() (Manifest, error) {
 	}
 
 	model := GetModel(config.Model)
+	embedding := GetEmbeddingModel(config.Embedding)
 
-	return Manifest{Llama: llama, Model: model}, nil
+	return Manifest{Llama: llama, Model: model, Embedding: embedding}, nil
 }
 
 func AppDataDir() (string, error) {

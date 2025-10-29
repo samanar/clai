@@ -47,11 +47,19 @@ func (m *Model) GetLlamaAsset() Asset {
 	return m.manifest.Llama
 }
 
+func (m *Model) GetEmbeddingAsset() Asset {
+	return m.manifest.Embedding
+}
+
 func (m *Model) EnsureAssets() error {
 	if err := m.GetLlamaAsset().Ensure(); err != nil {
 		return err
 	}
 	if err := m.GetModelAsset().Ensure(); err != nil {
+		return err
+	}
+
+	if err := m.GetEmbeddingAsset().Ensure(); err != nil {
 		return err
 	}
 	return nil
