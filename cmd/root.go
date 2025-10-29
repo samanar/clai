@@ -40,7 +40,6 @@ Special commands:
 			cmd.Println("Usage: clai \"your query here\"")
 			os.Exit(1)
 		}
-		fmt.Println(args)
 
 		userInput := strings.Join(args, " ")
 
@@ -63,12 +62,12 @@ Special commands:
 
 		// Display results
 		if len(results) == 0 {
-			cmd.Println("No commands generated")
+			fmt.Println("No commands generated")
 			return
 		}
 
 		for i, result := range results {
-			cmd.Printf("\n%d. %s\n", i+1, result.Explain)
+			fmt.Printf("\n%d. %s\n", i+1, result.Explain)
 
 			// Build full command string
 			fullCmd := result.Cmd
@@ -76,10 +75,10 @@ Special commands:
 				fullCmd += " " + strings.Join(result.Args, " ")
 			}
 
-			cmd.Printf("   $ %s\n", fullCmd)
+			fmt.Printf("$ %s\n", fullCmd)
 		}
 
-		cmd.Println()
+		fmt.Println()
 	},
 }
 
